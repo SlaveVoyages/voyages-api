@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block body %}
+
+<body>
+
+<h2>{{ page_collection_label }}</h2>
+
+<select name="collection" id="collection-select">
+    <option value="">--Other collections--</option>
+    
+    {% for c in other_collections %}
+    
+    <option value="/docs/gallery/{{ c.id }}/1">{{ c.label }}</option>
+    
+    {% endfor %}
+    
+</select>
+
+<hr/>
+{% if page_collection_id != None %}
+<div class="pagination">
+    <span class="step-links">
+        {% if page_obj.has_previous %}
+            <a href="1">&laquo; first</a>
+            <a href="/docs/gallery/{{ page_collection_id }}/{{ page_obj.previous_page_number }}">previous</a>
+        {% endif %}
+
+        <span class="current">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+        </span>
+
+        {% if page_obj.has_next %}
+            <a href="/docs/gallery/{{ page_collection_id }}/{{ page_obj.next_page_number }}">next</a>
+            <a href="/docs/gallery/{{ page_collection_id }}/{{ page_obj.paginator.num_pages }}">last &raquo;</a>
+        {% endif %}
+    </span>
+</div>
+<hr/>
+{% endif %}
+
+<div>
+
+{% for s in page_obj %}
+
+	<div>
+	<p><a href="/docs/gallery/single/{{s.id}}">{{ s.title }}<br/>{{ s.date }}</a><br/></p>
+	<table>
+	<tr>
+	<td>
+	{% for spc in s.page_connections.all %}
+		<img src="{{spc.page.square_thumbnail}}"></a>
+	{% endfor %}
+	</td>
+	<td>
+	<p>Filenames:<br/>
+		{% for spc in s.page_connections.all %}
+			<b>-->{{spc.id}} {{spc.page.image_filename}}</b><br/>
+			
+		{% endfor %}
+	</p>
+	</td>
+	</tr>
+	</table>
+	</div>
+	<hr/>
+
+{% endfor %}
+
+</div>
+
+{% if page_collection_id != None %}
+<div class="pagination">
+    <span class="step-links">
+        {% if page_obj.has_previous %}
+            <a href="1">&laquo; first</a>
+            <a href="/docs/gallery/{{ page_collection_id }}/{{ page_obj.previous_page_number }}">previous</a>
+        {% endif %}
+
+        <span class="current">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+        </span>
+
+        {% if page_obj.has_next %}
+            <a href="/docs/gallery/{{ page_collection_id }}/{{ page_obj.next_page_number }}">next</a>
+            <a href="/docs/gallery/{{ page_collection_id }}/{{ page_obj.paginator.num_pages }}">last &raquo;</a>
+        {% endif %}
+    </span>
+</div>
+{% endif %}
+
+</body>
+
+<script type="text/javascript" defer>
+
+$("#collection-select").on("change", function(event){
+	console.log(event.target.value)
+	window.location.replace(event.target.value)
+})
+
+</script>
+
+{% endblock %}

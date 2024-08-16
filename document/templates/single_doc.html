@@ -1,0 +1,63 @@
+<h2>{{ source.title }}</h2>
+<h3><a href="/admin/document/source/{{ source.id }}/change/" target="_blank">Edit</a></h3>
+<p><a href="https://www.zotero.org/groups/{{source.zotero_group_id}}/sv-docs/items/{{source.zotero_item_id}}/item-list">Zotero Item Link</a></p>
+{% if source.item_url %}
+<p>Library collection item listing: <a href="{{ source.item_url }}">{{ source.item_url }}</a></p>
+{% endif %}
+<hr/>
+<h4>Legacy Voyages Source Data</h4>
+
+{{ source.short_ref__name }}
+<br/>
+{{ source.title }}
+</p>
+<hr/>
+<h4>Pages</h4>
+
+<ol>
+
+{% for spc in source.page_connections.all %}
+<table border=1>
+	<tr>
+		<td>
+			<br/>
+
+			{% if spc.page.iiif_baseimage_url %}
+				Link to full image: <br/><a href="{{ spc.page.iiif_baseimage_url }}" target="_blank"><img src="{{ spc.page.square_thumbnail }}"></a></li></ul>
+			{% endif %}
+		</td>
+		{% if spc.page.transcriptions %}
+		<td>
+				<p><b><a href="/admin/document/page/{{ spc.page.id }}/change/" target="_blank">Edit Transcript Here</a></b></p>
+				
+				 {% for transcription in spc.page.transcriptions.all  %}
+				 <p>
+				 	{{ transcription.text }}
+				 
+				 </p>
+				 {% endfor %}
+				 
+				
+				<p></p>
+			
+		</td>
+		{% endif %}
+	</tr>
+</table>
+{% endfor %}
+
+</ol>
+<hr/>
+<h4>Linked entities</h4>
+
+<ol>
+{% for svc in source.source_voyage_connections.all %}
+	<li>Voyage #{{ svc.voyage.id }} : {{ svc.voyage.ship.ship_name}} --> <a href="/admin/voyage/voyage/{{ svc.voyage.id }}/change/" target="_blank">Edit</a></li>
+{% endfor %}
+</ol>
+
+<ol>
+{% for sepc in source.source_enslaved_connections.all %}
+	<li>Person: {{ sepc.enslaved.id }} : {{ sepc.enslaved.documented_name }} --> <a href="/admin/past/enslaved/{{ sepc.enslaved.id }}/change/" target="_blank">Edit</a></li>
+{% endfor %}
+</ol>

@@ -1,0 +1,48 @@
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = 'django-insecure-gfl=jfnj(+by72c%7v*ac=iix9u7azz$fpo2g*y3_b5)011ch7'
+
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = True
+
+ALLOWED_HOSTS = ['*']
+
+# STATIC_URL="http://voyages-django:8000/static/"
+FLASK_BASE_URL="http://voyages-stats:5000/"
+STATS_BASE_URL="http://voyages-stats:5000/"
+GEO_NETWORKS_BASE_URL="http://voyages-geo-networks:5005/"
+PEOPLE_NETWORKS_BASE_URL="http://voyages-people-networks:5006/"
+VOYAGES_FRONTEND_BASE_URL="http://127.0.0.1:3000/"
+OPEN_API_BASE_API="http://127.0.0.1:8000/"
+
+REDIS_HOST="voyages-redis"
+REDIS_PORT=6379
+USE_REDIS_CACHE=True
+
+zotero_credentials={
+	"api_key":"abcdefg",
+	"library_id":"hijklmnop",
+	"library_type":"qrstuv"
+}
+
+michigan_collection_manifests=[
+	'ghi',
+	'jkl'
+]
+
+transkribus_collection_ids=['1234567']
+
+DATABASES = {
+    'default': {
+        'ENGINE':'django.db.backends.mysql',
+        'NAME':'123',
+        'USER':'456',
+        'PASSWORD':'789',
+        'HOST':'voyages-mysql',
+        'PORT':'3306'
+    }
+}
+
+transkribus_credentials={
+	"user":"dcba",
+	"pw":"zyxw"
+}
