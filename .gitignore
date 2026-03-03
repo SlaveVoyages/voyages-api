@@ -105,3 +105,8 @@ dmypy.json
 
 # Pyre
 .pyre/
+
+localsettings.py
+google_auth.json
+.DS_Store
+static/
