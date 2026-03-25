@@ -4,6 +4,15 @@ The code in this container builds a Python Django API for the SlaveVoyages.org p
 
 A core principle of the rearchitecture was that the ORM should be exposed so that the relational data could be searched on more or less arbitrarily. For instance, you should be able to search Enslaved People by the name of the ship they were transported on, and you should be able to search Voyages for the names of the Enslaved People transported on them.
 
+## Containerization
+
+The app is built to be run as a standalone container.
+
+It must be run with a bind mount to localsettings, as this is not included in the docker image:
+
+	docker run -p 0.0.0.0:8000:8000 --mount type=bind,src=./voyages3/localsettings.py,target=/srv/voyages-api/voyages3/localsettings.py slavevoyages/voyages-api:latest
+
+
 ## Core dependencies
 
 * The API functionality is built on the Django Rest Framework (DRF) package
