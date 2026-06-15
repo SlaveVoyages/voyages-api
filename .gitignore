@@ -41,6 +41,7 @@ wheels/
 # Environments
 .env
 .venv
+.nmprc
 env/
 venv/
 ENV/
