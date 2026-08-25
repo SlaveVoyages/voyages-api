@@ -51,12 +51,15 @@ class VoyageShipSerializer(serializers.ModelSerializer):
 
 ##### ENSLAVED NUMBERS ##### 
 
+
+
 class VoyageSlavesNumbersSerializer(serializers.ModelSerializer):
 	class Meta:
 		model=VoyageSlavesNumbers
 		fields='__all__'
 
-	sort_by='value'
+
+
 
 ##### SPECIAL VARS ##### 
 
@@ -212,6 +215,11 @@ class VoyageSourceSerializer(serializers.ModelSerializer):
 		fields=['short_ref','title','bib','has_published_manifest','zotero_group_id','zotero_item_id']
 	def get_bib(self,instance) -> CharField():
 		raw_bib=instance.bib
+		#strip out paragraph tags injected by zotero
+		if raw_bib is not None:
+			raw_bib=re.sub("</*p.*?>","",raw_bib)
+			raw_bib=re.sub("</*div.*?>","",raw_bib)
+			raw_bib=re.sub("\\n"," ",raw_bib)
 		text_refs=[t for t in instance.page_ranges if t is not None]
 		if len(text_refs)>0:
 			return f"{raw_bib}: {', '.join(text_refs)}"
@@ -288,8 +296,8 @@ class VoyageSerializer(serializers.ModelSerializer):
 	def get_linked_voyages(self,instance) -> VoyageSourceSerializer(many=True):
 		incoming=instance.incoming_from_other_voyages.all()
 		outgoing=instance.outgoing_to_other_voyages.all()
-		incoming_ids=[i.voyage_id for i in incoming]
-		outgoing_ids=[o.voyage_id for o in outgoing]
+		incoming_ids=[i.first for i in incoming]
+		outgoing_ids=[o.second for o in outgoing]
 		linked_voyage_ids=list(set(incoming_ids+outgoing_ids))
 		return LinkedVoyageSerializer(linked_voyage_ids,many=True,read_only=True).data
 
@@ -379,7 +387,7 @@ class VoyageFilterItemSerializer(serializers.Serializer):
 ########### PAGINATED VOYAGE LISTS 
 @extend_schema_serializer(
 	examples = [
-         OpenApiExample(
+		 OpenApiExample(
 			'Paginated request for filtered voyages.',
 			summary='Paginated request for filtered voyages.',
 			description='Here, we request page 2 (with 5 items per page) of voyages for which enslaved people were purchased in Cuba or Florida between 1820-1822.',
@@ -409,7 +417,7 @@ class VoyageFilterItemSerializer(serializers.Serializer):
 			},
 			request_only=True
 		)
-    ]
+	]
 )
 class VoyageListRequestSerializer(serializers.Serializer):
 	page=serializers.IntegerField(required=False,allow_null=True)
@@ -676,7 +684,7 @@ class VoyageAggRoutesResponseSerializer(serializers.Serializer):
 ############ AGGREGATION FIELD
 @extend_schema_serializer(
 	examples = [
-         OpenApiExample(
+		 OpenApiExample(
 			'Filtered request for min/max',
 			summary='Filtered request for min/max',
 			description='Here, we request the min and max number of people who were embarked on individual voyages before the year 1620.',
@@ -692,7 +700,7 @@ class VoyageAggRoutesResponseSerializer(serializers.Serializer):
 			},
 			request_only=True
 		)
-    ]
+	]
 )
 class VoyageFieldAggregationRequestSerializer(serializers.Serializer):
 	varName=serializers.ChoiceField(choices=[
@@ -780,6 +788,7 @@ class VoyageCrossTabRequestSerializer(serializers.Serializer):
 	limit=serializers.IntegerField()
 	order_by=serializers.ListField(child=serializers.CharField(),allow_null=True,required=False)
 	global_search=serializers.CharField(allow_null=True,required=False)
+	filter=VoyageFilterItemSerializer(many=True,allow_null=True,required=False)
 	
 class VoyageCrossTabResponseSerializer(serializers.Serializer):
 	tablestructure=serializers.JSONField()

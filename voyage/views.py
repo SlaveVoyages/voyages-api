@@ -288,7 +288,7 @@ class VoyageCrossTabs(generics.GenericAPIView):
 			stats_req_data['ids']=ids
 			stats_req_data['cachename']='voyage_pivot_tables'
 			r=requests.post(url=u2,data=json.dumps(stats_req_data),headers={"Content-type":"application/json"})
-			
+			print(r)
 			#VALIDATE THE RESPONSE
 			if r.ok:
 				j=json.loads(r.text)
@@ -371,6 +371,7 @@ class VoyageLineAndBarCharts(generics.GenericAPIView):
 					'ids':ids,
 					'agg_fn':a_s['agg_fn']
 				}
+				by=re.sub("__bins__[0-9]+","",by)
 				json_resp=requests.post(url=u2,data=json.dumps(d2),headers={"Content-type":"application/json"})
 				pandas_resp=json.loads(json_resp.text)
 				resp[by]=pandas_resp[by]
@@ -744,7 +745,6 @@ class AfricanInfoList(generics.ListAPIView):
 	pagination_class=None
 	sort_by='value'
 	serializer_class=AfricanInfoSerializer
-
 
 class RigOfVesselList(generics.ListAPIView):
 	'''

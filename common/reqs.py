@@ -18,13 +18,37 @@ from past.models import *
 from voyage.models import *
 from blog.models import *
 import pickle
-
-
+import math
 from document.models import Source
 from common.autocomplete_indices import get_inverted_autocomplete_indices,autocomplete_indices,get_inverted_autocomplete_basic_index_field_endings
 import hashlib
 
 redis_cache = redis.Redis(host=REDIS_HOST, port=REDIS_PORT)
+
+#these need to present out, in all cases, as multiplied by 100
+percentage_fields=[
+	'voyage_slaves_numbers__child_ratio_among_embarked_slaves',
+	'voyage_slaves_numbers__child_ratio_among_landed_slaves',
+	'voyage_slaves_numbers__imp_mortality_ratio',
+	'voyage_slaves_numbers__male_ratio_among_embarked_slaves',
+	'voyage_slaves_numbers__male_ratio_among_landed_slaves',
+	'voyage_slaves_numbers__percentage_adult',
+	'voyage_slaves_numbers__percentage_boy',
+	'voyage_slaves_numbers__percentage_boys_among_embarked_slaves',
+	'voyage_slaves_numbers__percentage_boys_among_landed_slaves',
+	'voyage_slaves_numbers__percentage_child',
+	'voyage_slaves_numbers__percentage_female',
+	'voyage_slaves_numbers__percentage_girl',
+	'voyage_slaves_numbers__percentage_girls_among_embarked_slaves',
+	'voyage_slaves_numbers__percentage_girls_among_landed_slaves',
+	'voyage_slaves_numbers__percentage_male',
+	'voyage_slaves_numbers__percentage_men',
+	'voyage_slaves_numbers__percentage_men_among_embarked_slaves',
+	'voyage_slaves_numbers__percentage_men_among_landed_slaves',
+	'voyage_slaves_numbers__percentage_women',
+	'voyage_slaves_numbers__percentage_women_among_embarked_slaves',
+	'voyage_slaves_numbers__percentage_women_among_landed_slaves'
+]
 
 def clean_long_df(rows,selected_fields):
 	'''
@@ -72,6 +96,7 @@ def get_fieldstats(queryset,aggregation_field,options_dict):
 	'''
 	res=None
 	errormessages=[]
+	
 	if aggregation_field is None:
 		errormessages.append("you must supply a field to aggregate on")
 	else:
@@ -84,8 +109,15 @@ def get_fieldstats(queryset,aggregation_field,options_dict):
 				queryset=queryset.prefetch_related(prefetch_name)
 				if DEBUG:
 					print("prefetching:",prefetch_name)
-			min=queryset.aggregate(Min(aggregation_field)).popitem()[1]
-			max=queryset.aggregate(Max(aggregation_field)).popitem()[1]
+			min=math.floor(queryset.aggregate(Min(aggregation_field)).popitem()[1])
+			max=math.ceil(queryset.aggregate(Max(aggregation_field)).popitem()[1])
+			
+			if aggregation_field in percentage_fields:
+				if min<=1:
+					min=min*100
+				if max<=1:
+					max=max*100
+			
 			res={
 				'varName':aggregation_field,
 				'min':min,
@@ -163,6 +195,7 @@ def post_req(orig_queryset,s,r,options_dict,auto_prefetch=True,paginate=False):
 	if DEBUG:
 		print("PRE FILTER COUNT",orig_queryset.count())
 	
+	
 	#PREFETCH REQUISITE FIELDS
 	prefetch_fields=params.get('selected_fields') or []
 	if prefetch_fields==[] and auto_prefetch:
@@ -172,7 +205,6 @@ def post_req(orig_queryset,s,r,options_dict,auto_prefetch=True,paginate=False):
 	if DEBUG:
 		print(f'--prefetch: {len(prefetch_vars)} vars--')
 	for p in prefetch_vars:
-		
 		orig_queryset=orig_queryset.prefetch_related(p)
 	
 	# GLOBAL SEARCH
@@ -180,13 +212,27 @@ def post_req(orig_queryset,s,r,options_dict,auto_prefetch=True,paginate=False):
 	## hits solr with a search string (which currently is applied across all text fields on a model)
 	## and then creates its filtered queryset on the basis of the pk's returned by solr
 	qsetclassstr=str(orig_queryset[0].__class__)
+	
+	#patch for enslaver fields, aug 14, 2025
+	#performance hits on the below fields. we redirect to new names when these come in
+	#can probably retire this once saved queries using these vars are patched
+	bad_field_map={
+		"aliases__enslaver_relations__roles__name":"roles__name",
+		"aliases__enslaver_relations__relation__voyage__dataset":"voyages__dataset",
+		"aliases__enslaver_relations__relation__voyage__voyage_ship__ship_name":"voyages__voyage_ship__ship_name",
+		"aliases__enslaver_relations__relation__voyage__voyage_dates__imp_arrival_at_port_of_dis_sparsedate__year":"voyages__voyage_dates__imp_arrival_at_port_of_dis_sparsedate__year",
+		"aliases__enslaver_relations__relation__voyage__voyage_itinerary__imp_port_voyage_begin__value":"voyages__voyage_itinerary__imp_port_voyage_begin__value",
+		"aliases__enslaver_relations__relation__voyage__voyage_itinerary__imp_principal_region_of_slave_purchase__value":"voyages__voyage_itinerary__imp_principal_region_of_slave_purchase__value",
+		"aliases__enslaver_relations__relation__voyage__voyage_itinerary__imp_principal_port_slave_dis__value":"voyages__voyage_itinerary__imp_principal_port_slave_dis__value"
+	}
+	
 	if 'global_search' in params:
 		filtered_queryset,results_count=global_search(orig_queryset,params['global_search'])
 	# SPECIAL CASE SEARCH/FILTER
 	else:
 		st=time.time()
 		kwargs={}
-		ids=None
+		ids=[]
 		filtered_queryset=orig_queryset
 		c=0
 		
@@ -268,21 +314,31 @@ def post_req(orig_queryset,s,r,options_dict,auto_prefetch=True,paginate=False):
 				filter_obj.remove(item)
 		# TYPICAL ORM-BASED SEARCH/FILTER
 		for item in filter_obj:
-			if ids is not None:
-				filtered_queryset=filtered_queryset.filter(id__in=ids)
 			#construct the django-style search on any related field
 			op=item['op']
-			searchTerm=item["searchTerm"]
 			varName=item["varName"]
+			searchTerm=item["searchTerm"]
+			print(varName,varName in percentage_fields)
+			if varName in percentage_fields:
+				if type(searchTerm)==list:
+					searchTerm=[i/100 for i in searchTerm]
+				else:
+					searchTerm=searchTerm/100
+				print(searchTerm)
+			
+			#swap out bad fields (aug 14, 2025)
+			if varName in bad_field_map:
+				varName=bad_field_map[varName]
+				varNamestub='__'.join(varName.split('__')[:-1])
+				filtered_queryset=filtered_queryset.prefetch_related(varNamestub)
 			if op in ['lte','gte','exact','in','icontains']:
 				django_filter_term='__'.join([varName,op])
 				kwargs[django_filter_term]=searchTerm
-			elif op in ['exact']:
-				django_filter_term='__'.join([varName,op])
-				kwargs[op]=searchTerm
 			elif op == ['andlist']:
 				for st in searchTerm:
-					filtered_queryset=eval(f'filtered_queryset.filter({searchTerm}={varName})')
+					filterQ=f'filtered_queryset.filter({varName}={searchTerm})'
+					print(filterQ)
+					filtered_queryset=eval(filterQ)
 			elif op =='btw':
 				if type(searchTerm)==list and len(searchTerm)==2:
 					searchTerm.sort()
@@ -295,16 +351,15 @@ def post_req(orig_queryset,s,r,options_dict,auto_prefetch=True,paginate=False):
 				error_messages.append(f"Invalid Filter Item Operation: {item}")
 			
 			try:
+				print("kwargs-->",kwargs)
 				filtered_queryset=filtered_queryset.filter(**kwargs)
 			except Exception as e:
 				badfielderrormessage=f"Invalid Filter Item: {item} -> {e}"
 				error_messages.append(badfielderrormessage)
-				
-			if c<len(filter_obj):
-				ids=[i[0] for i in filtered_queryset.values_list('id')]
-			c+=1
+		
 		if DEBUG:
 			print(f"REQ FILTER TIME: {time.time()-st}")
+		
 	
 	# ORDER RESULTS
 	st=time.time()
@@ -313,21 +368,24 @@ def post_req(orig_queryset,s,r,options_dict,auto_prefetch=True,paginate=False):
 	if order_by is not None:
 		if DEBUG:
 			print(f"------>ORDER BY: {order_by}")
+		obl=[]
 		for ob in order_by:
 			if ob.startswith('-'):
 				k=ob[1:]
-				asc=False
+				ascdesc='asc'
 			else:
-				asc=True
+				ascdesc='desc'
 				k=ob
-
 			if k in all_fields:
-				if asc:
-					filtered_queryset=filtered_queryset.order_by(F(k).asc(nulls_last=True))
-				else:
-					filtered_queryset=filtered_queryset.order_by(F(k).desc(nulls_last=True))
+				obl.append(k)
 			else:
-				filtered_queryset=filtered_queryset.order_by('id')
+				print(f"key is invalid to sort on: {k}")
+			
+			oblstr=','.join([f"F('{k}').{ascdesc}(nulls_last=True)" for k in obl])
+			
+			qfilterstr=f"filtered_queryset.order_by({oblstr})"
+			filtered_queryset=eval(qfilterstr)
+			
 	else:
 		filtered_queryset=filtered_queryset.order_by('id')
 	
@@ -556,6 +614,7 @@ def autocomplete_req(queryset,self,request,options,sourcemodelname):
 		targetmodelname=inverted_autocomplete_basic_index_field_endings[sourcemodelname][varName]
 		fieldtail=re.sub('.*?__','',varName)
 		queryset=eval(f'{targetmodelname}.objects.all()')
+		
 		filtered_queryset,results_count,page,page_size,error_messages=post_req(
 			queryset,
 			self,
